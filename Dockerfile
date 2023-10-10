@@ -4,16 +4,9 @@ FROM dart:stable AS build
 
 WORKDIR /app
 
-# Install system-level dependencies.
-## Install Node & NPM.
-ENV NODE_VERSION=18.18.0
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
-ENV NVM_DIR=/root/.nvm
-RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION}
-ENV PATH="/root/.nvm/versions/node/v${NODE_VERSION}/bin/:${PATH}"
-
-## Install Firebase CLI.
-RUN npm install -g firebase-tools
+# Download Firebase CLI
+RUN curl -L https://github.com/firebase/firebase-tools/releases/latest/download/firebase-tools-linux --output firebase
+RUN chmod +x ./firebase
 
 # Resolve app dependencies.
 COPY pubspec.* ./
@@ -32,11 +25,13 @@ RUN dart compile exe build/bin/server.dart -o build/bin/server
 
 # Build minimal serving image from AOT-compiled `/server` and required system
 # libraries and configuration files stored in `/runtime/` from the build stage.
-FROM scratch
-COPY --from=build /runtime/ /
+FROM ubuntu
 COPY --from=build /app/build/bin/server /app/bin/
 # Uncomment the following line if you are serving static files.
 # COPY --from=build /app/build/public /public/
+
+# Install Firebase CLI
+COPY --from=build /app/firebase /bin/
 
 # Start the server.
 CMD ["/app/bin/server"]
